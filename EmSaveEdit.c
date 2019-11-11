@@ -13,16 +13,16 @@
 #define MAGENTA "\033[1;35m"
 #define CYAN    "\033[1;36m"
 
+uint32_t key, FID;
+uint16_t TID, SID;
+
 int main(int argc, char** argv)
 {
     int i;
     FILE* file;
-    uint32_t key, FID, psize;
-    uint16_t TID, SID;
+    char str[32];
     sect_t tempSect;
     sect_t* sects;
-    pkmn_t* party;
-    pkdat_t* tempDat;
 
     if(argc != 2)
     {
@@ -46,39 +46,80 @@ int main(int argc, char** argv)
         fread(&(tempSect.index), 4, 1, file);
         sects[tempSect.secID] = tempSect;
     }
+    fclose(file);
 
     /* Key and Trainer IDs */
     FID = *((uint32_t*)(sects[0].data + 0x0A));
     TID = FID & 0xFFFF;
     SID = (FID >> 16) & 0xFFFF;
     key = *((uint32_t*)(sects[0].data + 0x01F4));
+    
+    /* Print out trainer name and keys */
+    memcpy(str, sects[0].data, 8);
+    toASCII(str);
+    printf("%sTrainer name: %s%s\n", CYAN, WHITE, str);
+    printf("%sTID: %s%d\n", CYAN, WHITE, TID);
+    printf("%sSID: %s%d\n", CYAN, WHITE, SID);
+    printf("%skey: %s0x%08X\n\n", CYAN, WHITE, key);
 
-    //for(i = 0; sects[0].data[i] != 0xFF; i++)
-    //    printf("%02x ", sects[0].data[i]);
-    //printf("%02x\n", sects[0].data[i]);
-    toASCII(sects[0].data);
-    printf("%s\n", sects[0].data);
-    printf("TID: %d | SID: %d | key: %#x\n\n", TID, SID, key);
-    tempDat = malloc(sizeof(pkdat_t));
-
-    /* Read party, print out data */
-    psize = *((uint32_t*)(sects[1].data + 0x0234));
-    party = (pkmn_t*)(sects[1].data + 0x0238);
-    for(i = 0; i < psize; i++)
+    do
     {
-        toASCII(party[i].nick);
-        getPkdat(tempDat, party[i], FID);
-        printf("%sLV %d %s [%s] (%d exp):%s\n", CYAN, party[i].level, names[tempDat->G.species], party[i].nick, tempDat->G.exp, WHITE);
-        printf("  HP:   %3d [%2d | %2d]\n", party[i].maxHP, tempDat->E.hpEV,  (tempDat->M.IVEA)       & 0x1F);
-        printf("  ATT:  %3d [%2d | %2d]\n", party[i].att,   tempDat->E.attEV, (tempDat->M.IVEA >>  5) & 0x1F);
-        printf("  DEF:  %3d [%2d | %2d]\n", party[i].def,   tempDat->E.defEV, (tempDat->M.IVEA >> 10) & 0x1F);
-        printf("  SPA:  %3d [%2d | %2d]\n", party[i].spA,   tempDat->E.spAEV, (tempDat->M.IVEA >> 20) & 0x1F);
-        printf("  SPD:  %3d [%2d | %2d]\n", party[i].spD,   tempDat->E.spDEV, (tempDat->M.IVEA >> 25) & 0x1F);
-        printf("  SPE:  %3d [%2d | %2d]\n", party[i].spe,   tempDat->E.speEV, (tempDat->M.IVEA >> 15) & 0x1F);
-        printf("\n");
+        printf("> ");
+        if(fgets(str, 32, stdin) == NULL)
+        {
+            printf("\n");
+            break;
+        }
+
+        str[strlen(str)-1] = '\0';
+
+        if(strncmp(str, "quit", 5) == 0)
+            break;
+
+        if(strncmp(str, "p party", 6) == 0)
+        {
+            printParty(sects[1]);
+            continue;
+        }
     }
+    while(1);
+
+    free(sects);
 
     return(0);
+}
+
+void printParty(sect_t sect)
+{
+    uint32_t pSize, i;
+    pkmn_t* party;
+
+    pSize = *((uint32_t*)(sect.data + 0x0234));
+    party = (pkmn_t*)(sect.data + 0x0238);
+    for(i = 0; i < pSize; i++)
+    {
+        printf("\n");
+        printPKMN(party[i]);
+        printf("\n");
+    }
+}
+
+void printPKMN(pkmn_t p)
+{
+    char name[10];
+    pkdat_t dat;
+
+    memcpy(name, p.nick, 10);
+    toASCII(name);
+    getPkdat(&dat, p, FID);
+    
+    printf("%sLV %d %s [%s] (%d exp):%s\n", CYAN, p.level, names[dat.G.species], name, dat.G.exp, WHITE);
+    printf("  HP:   %3d [%2d | %2d]\n", p.maxHP, dat.E.hpEV,  (dat.M.IVEA)       & 0x1F);
+    printf("  ATT:  %3d [%2d | %2d]\n", p.att,   dat.E.attEV, (dat.M.IVEA >>  5) & 0x1F);
+    printf("  DEF:  %3d [%2d | %2d]\n", p.def,   dat.E.defEV, (dat.M.IVEA >> 10) & 0x1F);
+    printf("  SPA:  %3d [%2d | %2d]\n", p.spA,   dat.E.spAEV, (dat.M.IVEA >> 20) & 0x1F);
+    printf("  SPD:  %3d [%2d | %2d]\n", p.spD,   dat.E.spDEV, (dat.M.IVEA >> 25) & 0x1F);
+    printf("  SPE:  %3d [%2d | %2d]\n", p.spe,   dat.E.speEV, (dat.M.IVEA >> 15) & 0x1F);
 }
 
 void toASCII(uint8_t* str)

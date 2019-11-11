@@ -105,6 +105,8 @@ pkdat_t;
 
 void     toASCII(uint8_t*);
 void     getPkdat(pkdat_t*, pkmn_t, uint32_t);
+void     printPKMN(pkmn_t);
+void     printParty(sect_t);
 uint16_t getCheckPkmn(pkmn_t);
 uint16_t getCheckSect(sect_t);
 
